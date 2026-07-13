@@ -234,6 +234,12 @@
     background: var(--danger); color:#fff; font-size:12px; line-height:20px; text-align:center;
     cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,0.4); font-weight:700;
   }
+  .sigbox .dup{
+    position:absolute; top:-11px; left:-11px; width:20px; height:20px; border-radius:50%;
+    background: var(--cyan); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,0.4);
+  }
+  .sigbox .dup svg{ width:12px; height:12px; }
   .sigbox .tag{
     position:absolute; left:0; top:-19px; font-family:'JetBrains Mono',monospace; font-size:0.6rem;
     color:var(--cyan-2); letter-spacing:0.06em; text-transform:uppercase; white-space:nowrap; font-weight:500;
@@ -469,6 +475,7 @@
 
       <div>
         <h2>Assinaturas no documento</h2>
+        <p class="help">Clique no ícone <strong style="color:var(--cyan-2);">azul</strong> no canto da assinatura para duplicá-la em todas as páginas do documento.</p>
         <div class="list" id="placementList">
           <div class="empty-note">Nenhuma assinatura posicionada ainda.</div>
         </div>
@@ -899,12 +906,15 @@ function redrawOverlayForCurrentPage(){
     box.style.top = (p.yRatio*canvasH) + 'px';
     box.style.width = (p.wRatio*canvasW) + 'px';
     box.style.height = (p.hRatio*canvasH) + 'px';
-    box.innerHTML = `<span class="tag">assinatura</span><img src="${p.dataUrl}"><div class="handle"></div><div class="del">×</div>`;
+    const dupHtml = totalPages > 1
+      ? `<div class="dup" title="Duplicar esta assinatura em todas as páginas"><svg viewBox="0 0 24 24" fill="none" stroke="#05121F" stroke-width="2.6"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 012-2h10"/></svg></div>`
+      : '';
+    box.innerHTML = `<span class="tag">assinatura</span>${dupHtml}<img src="${p.dataUrl}"><div class="handle"></div><div class="del">×</div>`;
     els.overlay.appendChild(box);
 
     let dragging = false, sx=0, sy=0, ox=0, oy=0;
     box.addEventListener('pointerdown', e => {
-      if(e.target.classList.contains('handle') || e.target.classList.contains('del')) return;
+      if(e.target.closest('.handle') || e.target.closest('.del') || e.target.closest('.dup')) return;
       dragging = true; sx = e.clientX; sy = e.clientY;
       ox = parseFloat(box.style.left); oy = parseFloat(box.style.top);
       box.setPointerCapture(e.pointerId);
@@ -943,7 +953,43 @@ function redrawOverlayForCurrentPage(){
       renderPlacementList();
       if(placements.length === 0) els.downloadBtn.disabled = true;
     });
+
+    const dupBtn = box.querySelector('.dup');
+    if(dupBtn){
+      dupBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        duplicateToAllPages(p);
+      });
+    }
   });
+}
+
+function duplicateToAllPages(sourcePlacement){
+  let added = 0;
+  for(let pg = 1; pg <= totalPages; pg++){
+    if(pg === sourcePlacement.page) continue;
+    const alreadyThere = placements.some(p =>
+      p.page === pg && p.dataUrl === sourcePlacement.dataUrl &&
+      Math.abs(p.xRatio - sourcePlacement.xRatio) < 0.001 && Math.abs(p.yRatio - sourcePlacement.yRatio) < 0.001
+    );
+    if(alreadyThere) continue;
+    placements.push({
+      id: 'sig-' + (++placementCounter),
+      page: pg,
+      xRatio: sourcePlacement.xRatio,
+      yRatio: sourcePlacement.yRatio,
+      wRatio: sourcePlacement.wRatio,
+      hRatio: sourcePlacement.hRatio,
+      dataUrl: sourcePlacement.dataUrl
+    });
+    added++;
+  }
+  redrawOverlayForCurrentPage();
+  renderPlacementList();
+  if(placements.length > 0) els.downloadBtn.disabled = false;
+  if(added === 0){
+    // nothing to add — every other page already has this exact signature
+  }
 }
 
 function renderPlacementList(){
