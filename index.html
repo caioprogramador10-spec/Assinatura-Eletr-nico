@@ -330,6 +330,24 @@
     border-top:1px solid var(--border); padding-top:16px; max-width:760px;
   }
   footer.note strong{ color:var(--text-dim); font-weight:600; }
+
+  .govbr-box{
+    background: linear-gradient(165deg, rgba(58,199,240,0.10), rgba(58,199,240,0.03));
+    border:1px solid var(--success-border, rgba(79,221,160,0.28));
+    border-radius: var(--radius-sm); padding:14px;
+  }
+  .govbr-top{ display:flex; align-items:center; gap:9px; margin-bottom:6px; flex-wrap:wrap; }
+  .govbr-badge{
+    font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em;
+    color:#0B2B1E; background: var(--success); padding:3px 7px; border-radius:5px; font-weight:600;
+  }
+  .govbr-btn{
+    width:100%; justify-content:center; margin-top:10px;
+    background: linear-gradient(135deg, var(--success), #2C9E6F);
+    color:#06251A; border-color: rgba(255,255,255,0.3); font-weight:700;
+    box-shadow: 0 0 16px rgba(79,221,160,0.30), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .govbr-btn:hover{ filter: brightness(1.08); }
 </style>
 </head>
 <body>
@@ -459,6 +477,19 @@
         <input type="checkbox" id="stampDate" checked>
         Incluir data/hora abaixo de cada assinatura
       </label>
+
+      <hr class="sep">
+      <div class="govbr-box">
+        <div class="govbr-top">
+          <span class="govbr-badge">ICP-Brasil</span>
+          <h2 style="margin:0;">Precisa de validade jurídica reforçada?</h2>
+        </div>
+        <p class="help">Esta ferramenta gera uma assinatura visual. Para documentos que exigem certificação oficial, use o assinador gratuito do Governo Federal — ele confirma a identidade pela conta gov.br.</p>
+        <button class="btn govbr-btn" id="openGovBr">
+          Abrir assinador Gov.br
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -823,6 +854,10 @@ function dataUrlToBytes(dataUrl){
   for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+
+document.getElementById('openGovBr').addEventListener('click', () => {
+  window.open('https://assinador.iti.br/', '_blank', 'noopener,noreferrer');
+});
 </script>
 </body>
 </html>
