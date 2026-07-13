@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --bg-deep: #060B18;
@@ -405,9 +407,9 @@
         <div class="iconwrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
         </div>
-        <div class="title">Arraste o PDF aqui</div>
-        <div class="hint">ou clique para selecionar um arquivo do computador</div>
-        <input type="file" id="fileInput" accept="application/pdf">
+        <div class="title" id="dzTitle">Arraste o documento aqui</div>
+        <div class="hint" id="dzHint">PDF, Word (.docx), TXT ou imagem (JPG, PNG) — clique para selecionar</div>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,.gif,application/pdf,text/plain,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
       </div>
 
       <div id="pageStage">
@@ -495,6 +497,8 @@
 
   <footer class="note">
     <strong>Importante:</strong> esta ferramenta gera uma assinatura eletrônica visual (imagem sobreposta ao PDF), útil para agilizar processos internos de RH. Ela não é, por si só, uma assinatura digital certificada (ICP-Brasil). Se o documento exigir validade jurídica reforçada, combine este fluxo com um provedor de assinatura digital qualificada.
+    <br><br>
+    <strong>Formatos aceitos:</strong> PDF, Word (.docx), TXT e imagens (JPG/PNG/WEBP). Arquivos que não são PDF são convertidos automaticamente aqui mesmo no navegador antes de assinar — documentos Word e imagens viram páginas de imagem (não é mais possível copiar o texto depois), enquanto arquivos TXT mantêm o texto selecionável. Arquivos .doc (Word antigo) não são suportados; salve como .docx primeiro.
   </footer>
 </div>
 
@@ -526,6 +530,8 @@ const els = {
   placementList: document.getElementById('placementList'),
   stampDate: document.getElementById('stampDate'),
   stepsFill: document.getElementById('stepsFill'),
+  dzTitle: document.getElementById('dzTitle'),
+  dzHint: document.getElementById('dzHint'),
 };
 
 function setStep(n, done){
@@ -550,21 +556,175 @@ els.fileInput.addEventListener('change', e => { if(e.target.files[0]) loadFile(e
 els.trocarArquivo.addEventListener('click', () => els.fileInput.click());
 
 async function loadFile(file){
-  if(file.type !== 'application/pdf'){ alert('Por favor selecione um arquivo PDF.'); return; }
-  const buf = await file.arrayBuffer();
-  pdfBytesOriginal = new Uint8Array(buf);
-  pdfDocProxy = await pdfjsLib.getDocument({ data: pdfBytesOriginal.slice() }).promise;
-  totalPages = pdfDocProxy.numPages;
-  currentPage = 1;
-  placements = [];
-  renderPlacementList();
-  els.dropzone.style.display = 'none';
-  els.pageStage.style.display = 'block';
-  els.trocarArquivo.style.display = 'inline-flex';
-  els.seal.style.display = 'none';
-  els.downloadBtn.disabled = true;
-  await renderPage();
-  setStep(2);
+  setConverting(true, file.name);
+  try{
+    const bytes = await fileToPdfBytes(file);
+    pdfBytesOriginal = bytes;
+    pdfDocProxy = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    totalPages = pdfDocProxy.numPages;
+    currentPage = 1;
+    placements = [];
+    renderPlacementList();
+    els.dropzone.style.display = 'none';
+    els.pageStage.style.display = 'block';
+    els.trocarArquivo.style.display = 'inline-flex';
+    els.seal.style.display = 'none';
+    els.downloadBtn.disabled = true;
+    await renderPage();
+    setStep(2);
+  } catch(err){
+    console.error(err);
+    alert(err.message || 'Não foi possível abrir esse arquivo.');
+  } finally {
+    setConverting(false);
+  }
+}
+
+function setConverting(isConverting, fileName){
+  els.dropzone.style.pointerEvents = isConverting ? 'none' : 'auto';
+  els.dropzone.style.opacity = isConverting ? '0.6' : '1';
+  els.dzTitle.textContent = isConverting ? 'Convertendo documento…' : 'Arraste o documento aqui';
+  els.dzHint.textContent = isConverting
+    ? `Preparando "${fileName}" para assinatura`
+    : 'PDF, Word (.docx), TXT ou imagem (JPG, PNG) — clique para selecionar';
+}
+
+/* ---------- Convert any supported file into PDF bytes ---------- */
+async function fileToPdfBytes(file){
+  const name = file.name.toLowerCase();
+  const type = file.type;
+
+  if(type === 'application/pdf' || name.endsWith('.pdf')){
+    return new Uint8Array(await file.arrayBuffer());
+  }
+  if(name.endsWith('.docx') || type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'){
+    return await docxToPdfBytes(file);
+  }
+  if(name.endsWith('.txt') || type === 'text/plain'){
+    return await txtToPdfBytes(file);
+  }
+  if(name.endsWith('.doc')){
+    throw new Error('Arquivos .doc (Word antigo) não são suportados aqui. Salve como .docx ou PDF e tente novamente.');
+  }
+  if(type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp)$/i.test(name)){
+    return await imageToPdfBytes(file);
+  }
+  throw new Error('Formato não suportado. Use PDF, Word (.docx), TXT ou uma imagem (JPG/PNG).');
+}
+
+function readAsDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    r.readAsDataURL(file);
+  });
+}
+function loadImageEl(src){
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('Não foi possível ler essa imagem.'));
+    im.src = src;
+  });
+}
+
+async function imageToPdfBytes(file){
+  const dataUrl = await readAsDataUrl(file);
+  const imgEl = await loadImageEl(dataUrl);
+  const maxDim = 1700;
+  const scale = Math.min(1, maxDim / Math.max(imgEl.width, imgEl.height));
+  const w = Math.round(imgEl.width * scale), h = Math.round(imgEl.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+  const pngBytes = dataUrlToBytes(canvas.toDataURL('image/png'));
+
+  const pdfDoc = await PDFDocument.create();
+  const png = await pdfDoc.embedPng(pngBytes);
+  const page = pdfDoc.addPage([w, h]);
+  page.drawImage(png, { x: 0, y: 0, width: w, height: h });
+  return await pdfDoc.save();
+}
+
+async function docxToPdfBytes(file){
+  if(typeof mammoth === 'undefined' || typeof html2canvas === 'undefined'){
+    throw new Error('Não foi possível carregar o conversor de Word. Verifique sua conexão e tente novamente.');
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.convertToHtml({ arrayBuffer });
+
+  const pageWidthPx = 794; // ~A4 width @ 96dpi
+  const container = document.createElement('div');
+  container.style.cssText = `position:fixed; left:-9999px; top:0; width:${pageWidthPx}px; padding:60px 54px; background:#ffffff; color:#1a1a1a; font-family: Georgia, 'Times New Roman', serif; font-size:15px; line-height:1.6;`;
+  container.innerHTML = result.value;
+  document.body.appendChild(container);
+  await new Promise(r => setTimeout(r, 80));
+
+  let fullCanvas;
+  try{
+    fullCanvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+  } finally {
+    document.body.removeChild(container);
+  }
+
+  const pdfDoc = await PDFDocument.create();
+  const A4W = 595.28, A4H = 841.89;
+  const sliceHeightPx = Math.round(fullCanvas.width * (A4H / A4W));
+
+  let y = 0;
+  while(y < fullCanvas.height){
+    const sliceH = Math.min(sliceHeightPx, fullCanvas.height - y);
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width = fullCanvas.width;
+    sliceCanvas.height = sliceH;
+    sliceCanvas.getContext('2d').drawImage(fullCanvas, 0, y, fullCanvas.width, sliceH, 0, 0, fullCanvas.width, sliceH);
+    const png = await pdfDoc.embedPng(dataUrlToBytes(sliceCanvas.toDataURL('image/png')));
+    const pageH = A4W * (sliceH / fullCanvas.width);
+    const page = pdfDoc.addPage([A4W, pageH]);
+    page.drawImage(png, { x: 0, y: 0, width: A4W, height: pageH });
+    y += sliceH;
+  }
+  return await pdfDoc.save();
+}
+
+async function txtToPdfBytes(file){
+  const text = await file.text();
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontSize = 11;
+  const margin = 54;
+  const pageW = 595.28, pageH = 841.89;
+  const maxWidth = pageW - margin * 2;
+  const lineHeight = fontSize * 1.45;
+
+  const lines = [];
+  text.split(/\r?\n/).forEach(paragraph => {
+    if(paragraph.trim() === ''){ lines.push(''); return; }
+    let current = '';
+    paragraph.split(' ').forEach(word => {
+      const test = current ? current + ' ' + word : word;
+      if(font.widthOfTextAtSize(test, fontSize) > maxWidth && current){
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    });
+    lines.push(current);
+  });
+
+  let page = pdfDoc.addPage([pageW, pageH]);
+  let cursorY = pageH - margin;
+  for(const line of lines){
+    if(cursorY < margin){
+      page = pdfDoc.addPage([pageW, pageH]);
+      cursorY = pageH - margin;
+    }
+    page.drawText(line, { x: margin, y: cursorY, size: fontSize, font, color: rgb(0.07, 0.1, 0.16) });
+    cursorY -= lineHeight;
+  }
+  return await pdfDoc.save();
 }
 
 const viewerStageWrap = document.querySelector('.viewer');
