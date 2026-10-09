@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assinador · Conexão Rastreadores</title>
+  <meta name="description" content="Importe, assine e baixe documentos sem impressora e sem scanner. Tudo processado no navegador." />
+  <meta name="theme-color" content="#0b8fe0" />
+  <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/img/logo.png" />
+
+  <!-- Aplica o tema salvo antes da pintura, para a página não piscar -->
+  <script>(function(){try{var t=localStorage.getItem("assin_tema");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@600&family=Dancing+Script:wght@600&family=Great+Vibes&family=Fraunces:ital,wght@1,500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/layout.css" />
+  <link rel="stylesheet" href="assets/css/components.css" />
+  <link rel="stylesheet" href="assets/css/assinador.css" />
+
+  <!-- Bibliotecas de PDF e conversão (rodam 100% no navegador) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+  <!-- =====================================================================
+       ÍCONES (sprite SVG) — usados com <svg class="ico"><use href="#i-nome"/></svg>
+       ===================================================================== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-caneta" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-biblioteca" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 15c1.5-3 3-4.5 4-4.5S12 13 13.5 13s2-2 3.5-2"/></symbol>
+    <symbol id="i-historico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-documento" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-carregando" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></symbol>
+    <symbol id="i-esq" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-dir" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-zoom-mais" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></symbol>
+    <symbol id="i-zoom-menos" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6"/></symbol>
+    <symbol id="i-ajustar" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></symbol>
+    <symbol id="i-texto" viewBox="0 0 24 24"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/></symbol>
+    <symbol id="i-imagem" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-salvar" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-desfazer" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+    <symbol id="i-lixeira" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-check-circulo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-trocar" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.8 9.8 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.8 9.8 0 0 0 6.7-2.7L21 16"/><path d="M16 16h5v5"/></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-paginas" viewBox="0 0 24 24"><rect x="7" y="3" width="13" height="16" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h10"/></symbol>
+    <symbol id="i-fechar" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-lua" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-externo" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-teclado" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+  </svg>
+
+  <!-- =====================================================================
+       APLICAÇÃO
+       ===================================================================== -->
+  <div class="app">
+
+    <!-- ---------- MENU LATERAL ---------- -->
+    <aside class="sidebar" id="sidebar" aria-label="Menu principal">
+      <div class="sb-brand">
+        <div class="sb-logo">
+          <img src="assets/img/logo-completa.png" alt="Conexão Rastreadores" />
+          <span class="sb-logo-sub">Assinador eletrônico</span>
+        </div>
+        <button class="btn btn-icon sb-close" type="button" data-acao="fechar-menu" aria-label="Fechar menu">
+          <svg class="ico"><use href="#i-fechar"/></svg>
+        </button>
+      </div>
+
+      <nav class="sb-nav">
+        <p class="sb-group">Documentos</p>
+        <button class="nav-item" data-rota="assinar" type="button">
+          <svg class="ico"><use href="#i-caneta"/></svg><span>Assinar documento</span>
+        </button>
+        <button class="nav-item" data-rota="historico" type="button">
+          <svg class="ico"><use href="#i-historico"/></svg><span>Histórico</span>
+          <span class="count" id="nav-count-historico" title="Documentos assinados neste navegador"></span>
+        </button>
+
+        <p class="sb-group">Assinaturas</p>
+        <button class="nav-item" data-rota="assinaturas" type="button">
+          <svg class="ico"><use href="#i-biblioteca"/></svg><span>Minhas assinaturas</span>
+          <span class="count" id="nav-count-salvas" title="Assinaturas salvas"></span>
+        </button>
+
+        <p class="sb-group">Ajuda</p>
+        <button class="nav-item" data-rota="validade" type="button">
+          <svg class="ico"><use href="#i-escudo"/></svg><span>Validade jurídica</span>
+        </button>
+        <a class="nav-item nav-tool" href="https://assinador.iti.br/" target="_blank" rel="noopener noreferrer">
+          <svg class="ico"><use href="#i-externo"/></svg><span>Assinador Gov.br</span>
+          <svg class="ico ico-externo"><use href="#i-seta"/></svg>
+        </a>
+      </nav>
+
+      <div class="sb-selo">
+        <svg class="ico"><use href="#i-cadeado"/></svg>
+        <div><strong>100% no navegador</strong>Seus arquivos não são enviados para nenhum servidor.</div>
+      </div>
+
+      <div class="sb-foot">
+        <div class="sb-user">
+          <span class="avatar-usuario" aria-hidden="true"><svg class="ico"><use href="#i-caneta"/></svg></span>
+          <div class="sb-user-info">
+            <span class="sb-user-label">Assinatura eletrônica</span>
+            <span class="user-badge">v2.0 · Premium</span>
+          </div>
+        </div>
+        <div class="sb-foot-actions">
+          <button class="btn btn-icon" type="button" data-acao="tema" title="Alternar tema claro/escuro" aria-label="Alternar tema">
+            <svg class="ico icon-sun"><use href="#i-sol"/></svg><svg class="ico icon-moon"><use href="#i-lua"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <div class="sb-backdrop" id="sb-backdrop" data-acao="fechar-menu"></div>
+
+    <!-- ---------- CONTEÚDO ---------- -->
+    <div class="main-col">
+
+      <header class="mobilebar">
+        <button class="btn btn-icon" type="button" data-acao="abrir-menu" aria-label="Abrir menu">
+          <svg class="ico"><use href="#i-menu"/></svg>
+        </button>
+        <img class="mobilebar-logo" src="assets/img/logo.png" alt="" />
+        <div class="mobilebar-title">
+          <strong id="mobile-titulo">Assinar documento</strong>
+          <span>Assinador</span>
+        </div>
+      </header>
+
+      <main class="conteudo">
+
+        <!-- ===================== ASSINAR DOCUMENTO ===================== -->
+        <section id="pagina-assinar" class="pagina" data-titulo="Assinar documento">
+          <div class="page-head">
+            <div>
+              <p class="page-eyebrow">Assinatura eletrônica</p>
+              <h1 class="page-title">Assinar documento</h1>
+              <p class="page-sub">Importe, assine e baixe — sem impressora e sem scanner. Tudo é processado aqui mesmo, no seu navegador.</p>
+            </div>
+            <span class="page-date" id="data-hoje"></span>
+          </div>
+
+          <!-- etapas -->
+          <div class="panel stepper" id="stepper">
+            <div class="step" data-step="1">
+              <span class="step-node"><span class="num">01</span><svg class="ico"><use href="#i-check"/></svg></span>
+              <div class="step-txt"><strong>Importar</strong><span>PDF, Word, TXT ou imagem</span></div>
+            </div>
+            <div class="step" data-step="2">
+              <span class="step-node"><span class="num">02</span><svg class="ico"><use href="#i-check"/></svg></span>
+              <div class="step-txt"><strong>Assinar</strong><span>Desenhe, digite ou envie</span></div>
+            </div>
+            <div class="step" data-step="3">
+              <span class="step-node"><span class="num">03</span><svg class="ico"><use href="#i-check"/></svg></span>
+              <div class="step-txt"><strong>Posicionar</strong><span>Arraste e redimensione</span></div>
+            </div>
+            <div class="step" data-step="4">
+              <span class="step-node"><span class="num">04</span><svg class="ico"><use href="#i-check"/></svg></span>
+              <div class="step-txt"><strong>Baixar</strong><span>PDF já assinado</span></div>
+            </div>
+          </div>
+
+          <div class="workspace">
+
+            <!-- ---------- VISUALIZADOR ---------- -->
+            <div class="panel viewer" id="viewer">
+              <div class="viewer-bar">
+                <div class="file-chip">
+                  <span class="file-chip-ico"><svg class="ico"><use href="#i-documento"/></svg></span>
+                  <div class="file-chip-txt">
+                    <strong id="doc-nome">Nenhum documento</strong>
+                    <span id="doc-meta">Importe um arquivo para começar</span>
+                  </div>
+                </div>
+
+                <div class="viewer-bar-grupo">
+                  <div class="ctrl" aria-label="Páginas">
+                    <button type="button" id="btn-pag-ant" disabled title="Página anterior (←)" aria-label="Página anterior"><svg class="ico"><use href="#i-esq"/></svg></button>
+                    <span class="ctrl-valor" id="pag-label">— / —</span>
+                    <button type="button" id="btn-pag-prox" disabled title="Próxima página (→)" aria-label="Próxima página"><svg class="ico"><use href="#i-dir"/></svg></button>
+                  </div>
+                  <div class="ctrl" aria-label="Zoom">
+                    <button type="button" id="btn-zoom-menos" disabled title="Diminuir zoom" aria-label="Diminuir zoom"><svg class="ico"><use href="#i-zoom-menos"/></svg></button>
+                    <span class="ctrl-valor" id="zoom-label">100%</span>
+                    <button type="button" id="btn-zoom-mais" disabled title="Aumentar zoom" aria-label="Aumentar zoom"><svg class="ico"><use href="#i-zoom-mais"/></svg></button>
+                    <button type="button" id="btn-zoom-ajustar" disabled title="Ajustar à largura" aria-label="Ajustar à largura"><svg class="ico"><use href="#i-ajustar"/></svg></button>
+                  </div>
+                  <button class="btn btn-sm" type="button" id="btn-trocar" hidden>
+                    <svg class="ico"><use href="#i-trocar"/></svg><span class="txt-trocar">Trocar arquivo</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="viewer-corpo">
+                <div class="thumbs" id="thumbs" aria-label="Páginas do documento"></div>
+
+                <div class="stage" id="stage">
+                  <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Importar documento">
+                    <div class="dz-ico"><svg class="ico" id="dz-icone"><use href="#i-upload"/></svg></div>
+                    <div class="dz-titulo" id="dz-titulo">Arraste o documento aqui</div>
+                    <div class="dz-dica" id="dz-dica">ou clique para selecionar um arquivo do computador</div>
+                    <span class="btn btn-accent"><svg class="ico"><use href="#i-upload"/></svg>Selecionar arquivo</span>
+                    <div class="dz-formatos">
+                      <span class="tag tag-vencido">PDF</span>
+                      <span class="tag tag-info">Word .docx</span>
+                      <span class="tag tag-neutro">TXT</span>
+                      <span class="tag tag-violeta">JPG · PNG · WEBP</span>
+                    </div>
+                    <input type="file" id="file-input" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,.gif,application/pdf,text/plain,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                  </div>
+
+                  <div id="pageStage">
+                    <canvas id="pdfCanvas"></canvas>
+                    <div id="overlay"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="faixa-ok" id="faixa-ok">
+                <svg class="ico"><use href="#i-check-circulo"/></svg>
+                <span id="faixa-ok-texto">Documento assinado e baixado.</span>
+                <button class="btn btn-sm btn-success" type="button" id="btn-novo-doc">
+                  <svg class="ico"><use href="#i-mais"/></svg>Assinar outro
+                </button>
+              </div>
+            </div>
+
+            <!-- ---------- PAINEL DA ASSINATURA ---------- -->
+            <aside class="panel side" id="painel-assinatura">
+
+              <div class="bloco">
+                <h2>Sua assinatura</h2>
+                <p class="hint">Crie a assinatura e clique em <strong>Inserir no documento</strong>. Depois é só arrastar e redimensionar.</p>
+
+                <div class="seg" role="tablist" aria-label="Forma de assinar">
+                  <button class="seg-opt" type="button" data-aba="desenhar" aria-pressed="true"><svg class="ico"><use href="#i-caneta"/></svg>Desenhar</button>
+                  <button class="seg-opt" type="button" data-aba="digitar" aria-pressed="false"><svg class="ico"><use href="#i-texto"/></svg>Digitar</button>
+                  <button class="seg-opt" type="button" data-aba="imagem" aria-pressed="false"><svg class="ico"><use href="#i-imagem"/></svg>Imagem</button>
+                </div>
+
+                <!-- desenhar -->
+                <div class="aba ativa" data-aba-painel="desenhar">
+                  <div class="papel" id="papel-pad">
+                    <canvas id="padCanvas"></canvas>
+                    <span class="papel-x">×</span>
+                    <span class="papel-dica">Assine aqui com o mouse ou o dedo</span>
+                  </div>
+                  <div class="ferramentas-pad">
+                    <div class="tintas" role="group" aria-label="Cor da tinta">
+                      <button class="tinta" type="button" style="--cor:#12203a" data-tinta="#12203a" aria-pressed="true" title="Preto"></button>
+                      <button class="tinta" type="button" style="--cor:#1d4ed8" data-tinta="#1d4ed8" aria-pressed="false" title="Azul caneta"></button>
+                      <button class="tinta" type="button" style="--cor:#0b8fe0" data-tinta="#0b8fe0" aria-pressed="false" title="Azul claro"></button>
+                    </div>
+                    <label class="espessura" title="Espessura do traço">
+                      Traço <input type="range" id="espessura" min="1.4" max="5" step="0.2" value="2.6" />
+                    </label>
+                  </div>
+                  <div class="linha-acoes">
+                    <button class="btn btn-icon" type="button" id="btn-desfazer" title="Desfazer último traço" aria-label="Desfazer"><svg class="ico"><use href="#i-desfazer"/></svg></button>
+                    <button class="btn" type="button" id="btn-limpar"><svg class="ico"><use href="#i-lixeira"/></svg>Limpar</button>
+                    <button class="btn btn-accent" type="button" id="btn-usar-desenho"><svg class="ico"><use href="#i-check"/></svg>Inserir no documento</button>
+                  </div>
+                </div>
+
+                <!-- digitar -->
+                <div class="aba" data-aba-painel="digitar">
+                  <div class="form-grupo">
+                    <label for="nome-digitado">Nome completo</label>
+                    <input type="text" id="nome-digitado" placeholder="Digite seu nome" autocomplete="name" maxlength="60" />
+                  </div>
+                  <div class="papel">
+                    <div class="previa-digitada" id="previa-digitada">Seu Nome</div>
+                  </div>
+                  <div class="fontes" id="fontes"></div>
+                  <div class="linha-acoes">
+                    <button class="btn btn-accent" type="button" id="btn-usar-digitada"><svg class="ico"><use href="#i-check"/></svg>Inserir no documento</button>
+                  </div>
+                </div>
+
+                <!-- imagem -->
+                <div class="aba" data-aba-painel="imagem">
+                  <div class="img-drop" id="img-drop" role="button" tabindex="0">
+                    <svg class="ico"><use href="#i-imagem"/></svg>
+                    <span><strong>Envie uma foto da sua assinatura</strong><br />PNG com fundo transparente funciona melhor</span>
+                  </div>
+                  <input type="file" id="img-input" accept="image/*" hidden />
+                  <label class="chave" style="margin-top:14px">
+                    <input type="checkbox" id="remover-fundo" checked />
+                    <span class="chave-trilho"></span>
+                    <span>Remover fundo branco<small>Deixa só a tinta (ideal para foto de papel)</small></span>
+                  </label>
+                  <div class="linha-acoes">
+                    <button class="btn btn-accent" type="button" id="btn-usar-imagem" disabled><svg class="ico"><use href="#i-check"/></svg>Inserir no documento</button>
+                  </div>
+                </div>
+
+                <label class="chave" style="margin:14px 0 0">
+                  <input type="checkbox" id="salvar-biblioteca" />
+                  <span class="chave-trilho"></span>
+                  <span>Salvar em Minhas assinaturas<small>Fica guardada só neste navegador</small></span>
+                </label>
+              </div>
+
+              <div class="bloco" id="bloco-salvas" hidden>
+                <h2>Assinaturas salvas</h2>
+                <p class="hint">Clique para inserir no documento.</p>
+                <div class="salvas-mini" id="salvas-mini"></div>
+              </div>
+
+              <div class="bloco">
+                <h2>No documento <span class="count" id="count-posicionadas"></span></h2>
+                <p class="hint">Use <svg class="ico" style="display:inline;vertical-align:-3px;width:14px;height:14px"><use href="#i-copiar"/></svg> na assinatura para repeti-la em todas as páginas.</p>
+                <div class="lista-pos" id="lista-pos"></div>
+              </div>
+
+              <div class="bloco">
+                <h2>Carimbo</h2>
+                <p class="hint">Texto pequeno impresso abaixo de cada assinatura.</p>
+                <label class="chave">
+                  <input type="checkbox" id="carimbo-data" checked />
+                  <span class="chave-trilho"></span>
+                  <span>Data e hora da assinatura<small>"Assinado eletronicamente em …"</small></span>
+                </label>
+                <div class="form-grupo" style="margin-bottom:18px">
+                  <label for="carimbo-nome">Nome do signatário (opcional)</label>
+                  <input type="text" id="carimbo-nome" placeholder="Ex.: Maria Souza — CPF ***.123.456-**" maxlength="80" />
+                </div>
+                <button class="btn btn-accent btn-baixar" type="button" id="btn-baixar" disabled>
+                  <svg class="ico"><use href="#i-baixar"/></svg>Baixar PDF assinado
+                </button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <!-- ===================== MINHAS ASSINATURAS ===================== -->
+        <section id="pagina-assinaturas" class="pagina" data-titulo="Minhas assinaturas">
+          <div class="page-head">
+            <div>
+              <p class="page-eyebrow">Biblioteca</p>
+              <h1 class="page-title">Minhas assinaturas</h1>
+              <p class="page-sub">Assinaturas e rubricas salvas para reutilizar em um clique. Ficam guardadas apenas neste navegador.</p>
+            </div>
+            <div class="page-tools">
+              <button class="btn btn-accent" type="button" data-ir="assinar"><svg class="ico"><use href="#i-mais"/></svg>Criar assinatura</button>
+            </div>
+          </div>
+          <div class="grade-salvas" id="grade-salvas"></div>
+        </section>
+
+        <!-- ===================== HISTÓRICO ===================== -->
+        <section id="pagina-historico" class="pagina" data-titulo="Histórico">
+          <div class="page-head">
+            <div>
+              <p class="page-eyebrow">Registro local</p>
+              <h1 class="page-title">Histórico de assinaturas</h1>
+              <p class="page-sub">Documentos assinados neste navegador. Guardamos só o registro (nome, data e páginas) — nunca o arquivo.</p>
+            </div>
+            <div class="page-tools">
+              <button class="btn btn-danger" type="button" id="btn-limpar-historico"><svg class="ico"><use href="#i-lixeira"/></svg>Limpar histórico</button>
+            </div>
+          </div>
+
+          <div class="stats" id="stats-historico"></div>
+
+          <div class="table-wrap panel" style="padding:0">
+            <table>
+              <thead>
+                <tr>
+                  <th>Documento</th>
+                  <th>Assinado em</th>
+                  <th>Páginas</th>
+                  <th>Assinaturas</th>
+                  <th>Signatário</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-historico"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ===================== VALIDADE JURÍDICA ===================== -->
+        <section id="pagina-validade" class="pagina" data-titulo="Validade jurídica">
+          <div class="page-head">
+            <div>
+              <p class="page-eyebrow">Ajuda</p>
+              <h1 class="page-title">Validade jurídica e formatos</h1>
+              <p class="page-sub">Entenda o que esta ferramenta gera e quando usar uma assinatura com certificado digital.</p>
+            </div>
+          </div>
+
+          <div class="hero-govbr">
+            <img class="hero-logo" src="assets/img/logo-completa.png" alt="Conexão Rastreadores" />
+            <p class="eyebrow">ICP-Brasil · Gov.br</p>
+            <h2>Precisa de validade jurídica reforçada?</h2>
+            <p>Esta ferramenta gera uma assinatura eletrônica visual. Para documentos que exigem certificação oficial, use o assinador gratuito do Governo Federal — ele confirma sua identidade pela conta gov.br (nível prata ou ouro).</p>
+            <a class="btn btn-govbr" href="https://assinador.iti.br/" target="_blank" rel="noopener noreferrer">
+              Abrir assinador Gov.br <svg class="ico"><use href="#i-externo"/></svg>
+            </a>
+          </div>
+
+          <div class="cards-info">
+            <div class="panel">
+              <div class="info-ico ok"><svg class="ico"><use href="#i-check-circulo"/></svg></div>
+              <h2>Quando usar o Assinador</h2>
+              <ul class="lista-check" style="margin-top:12px">
+                <li><svg class="ico"><use href="#i-check"/></svg><span><strong>Processos internos de RH</strong> — termos, recibos, ciência de normas.</span></li>
+                <li><svg class="ico"><use href="#i-check"/></svg><span><strong>Documentos do dia a dia</strong> que hoje você imprime só para assinar.</span></li>
+                <li><svg class="ico"><use href="#i-check"/></svg><span><strong>Rubricas</strong> em todas as páginas de um contrato.</span></li>
+              </ul>
+            </div>
+            <div class="panel">
+              <div class="info-ico alerta"><svg class="ico"><use href="#i-alerta"/></svg></div>
+              <h2>O que ela não é</h2>
+              <p class="texto-info" style="margin-top:12px">A assinatura é uma <strong>imagem sobreposta ao PDF</strong>. Ela não é, por si só, uma assinatura digital certificada (ICP-Brasil).</p>
+              <p class="texto-info">Se o documento exigir validade jurídica reforçada, combine este fluxo com o Gov.br ou com um provedor de assinatura qualificada.</p>
+            </div>
+            <div class="panel">
+              <div class="info-ico"><svg class="ico"><use href="#i-cadeado"/></svg></div>
+              <h2>Privacidade</h2>
+              <p class="texto-info" style="margin-top:12px">Todo o processamento acontece <strong>no seu navegador</strong>. O documento nunca é enviado para um servidor.</p>
+              <p class="texto-info">Assinaturas salvas e o histórico ficam no armazenamento local deste computador e podem ser apagados a qualquer momento.</p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Formatos aceitos</h2>
+            <p class="hint">Arquivos que não são PDF são convertidos automaticamente antes de assinar.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Formato</th><th>Como é tratado</th><th>Texto selecionável</th></tr></thead>
+                <tbody>
+                  <tr><td><div class="pessoa" style="display:flex;align-items:center;gap:10px"><span class="formato-ico">PDF</span><strong>PDF</strong></div></td><td>Assinado diretamente, sem conversão.</td><td><span class="tag tag-ok">Mantido</span></td></tr>
+                  <tr><td><div style="display:flex;align-items:center;gap:10px"><span class="formato-ico">DOCX</span><strong>Word (.docx)</strong></div></td><td>Convertido em páginas A4 de imagem.</td><td><span class="tag tag-alerta">Vira imagem</span></td></tr>
+                  <tr><td><div style="display:flex;align-items:center;gap:10px"><span class="formato-ico">TXT</span><strong>Texto (.txt)</strong></div></td><td>Diagramado em páginas A4.</td><td><span class="tag tag-ok">Mantido</span></td></tr>
+                  <tr><td><div style="display:flex;align-items:center;gap:10px"><span class="formato-ico">IMG</span><strong>JPG, PNG, WEBP</strong></div></td><td>Cada imagem vira uma página.</td><td><span class="tag tag-neutro">Não se aplica</span></td></tr>
+                  <tr><td><div style="display:flex;align-items:center;gap:10px"><span class="formato-ico">DOC</span><strong>Word antigo (.doc)</strong></div></td><td>Não suportado — salve como .docx ou PDF.</td><td><span class="tag tag-vencido">Não aceito</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2><svg class="ico"><use href="#i-teclado"/></svg>Atalhos de teclado</h2>
+            <p class="hint">Na tela de assinatura, com um documento aberto.</p>
+            <div class="table-wrap">
+              <table>
+                <tbody>
+                  <tr><td><code>←</code> <code>→</code></td><td>Página anterior / próxima</td></tr>
+                  <tr><td><code>Delete</code></td><td>Remove a assinatura selecionada</td></tr>
+                  <tr><td><code>Ctrl</code> + <code>D</code></td><td>Repete a assinatura selecionada em todas as páginas</td></tr>
+                  <tr><td><code>Esc</code></td><td>Tira a seleção</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <footer class="rodape">Conexão Rastreadores · Assinador · processado localmente no navegador</footer>
+    </div>
+  </div>
+
+  <!-- ---------- BARRA DE AÇÕES NO CELULAR ---------- -->
+  <div class="barra-mobile" id="barra-mobile">
+    <button class="btn" type="button" id="btn-ir-assinatura"><svg class="ico"><use href="#i-caneta"/></svg>Assinatura</button>
+    <button class="btn btn-accent" type="button" id="btn-baixar-mobile" disabled><svg class="ico"><use href="#i-baixar"/></svg>Baixar PDF</button>
+  </div>
+
+  <!-- ---------- MODAL DE CONFIRMAÇÃO ---------- -->
+  <div class="modal-overlay" id="modal-confirmar" role="dialog" aria-modal="true" aria-labelledby="confirmar-titulo">
+    <div class="modal">
+      <div class="confirm-ico" id="confirmar-ico"><svg class="ico"><use href="#i-alerta"/></svg></div>
+      <h3 id="confirmar-titulo">Confirmar</h3>
+      <p id="confirmar-texto"></p>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="confirmar-nao">Cancelar</button>
+        <button class="btn btn-accent" type="button" id="confirmar-sim">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ---------- SCRIPTS (ordem importa) ---------- -->
+  <script src="js/core/utils.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/router.js"></script>
+  <script src="js/modulos/conversor.js"></script>
+  <script src="js/modulos/documento.js"></script>
+  <script src="js/modulos/criador.js"></script>
+  <script src="js/modulos/exportar.js"></script>
+  <script src="js/modulos/biblioteca.js"></script>
+  <script src="js/modulos/historico.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
