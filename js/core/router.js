@@ -15,7 +15,7 @@ const Router = (() => {
 
   function mostrar(rota) {
     atual = rota;
-    document.body.dataset.rota = rota;
+    document.body.dataset.paginaAtual = rota;
     $$(".pagina").forEach((p) => p.classList.toggle("ativa", p.id === "pagina-" + rota));
     $$(".nav-item[data-rota]").forEach((n) => n.classList.toggle("ativo", n.dataset.rota === rota));
     const pagina = $("#pagina-" + rota);
@@ -37,7 +37,7 @@ const Router = (() => {
 
   function iniciar() {
     document.addEventListener("click", (e) => {
-      const alvo = e.target.closest("[data-rota], [data-ir]");
+      const alvo = e.target.closest(".nav-item[data-rota], [data-ir]");
       if (!alvo || alvo.tagName === "A") return;
       ir(alvo.dataset.rota || alvo.dataset.ir);
     });
